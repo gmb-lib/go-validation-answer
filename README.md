@@ -33,8 +33,11 @@ res, err := answer.NormalizeReport(rawReport) // the verbatim {data:{…}} bytes
 (`answer.Signature`: per-signature verdict, format profile, legal-meaning
 level, signer identity, signing / revocation / max-validity times, warnings,
 errors). The top-level per-signer fields mirror the **first** signature for
-single-signature callers. `signatureId` / `documentId` / `reportId` are caller
-context, set by the serving side.
+single-signature callers. `signatureId` / `documentId` / `reportId` /
+`validatedAt` are caller context, set by the serving side — `validatedAt` is
+when the validation actually ran (RFC 3339): validation is time-anchored
+(revocation can post-date it), so an answer served later than it was produced
+renders "as of" that moment, never as current.
 
 Rules baked in:
 

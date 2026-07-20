@@ -52,8 +52,11 @@ type Signature struct {
 // full set.
 //
 // SignatureID / DocumentID are caller context (which recorded signature or
-// which document was validated — at most one is set) and ReportID is the
-// persisted-answer id; all three are set by the serving side, not by
+// which document was validated — at most one is set), ReportID is the
+// persisted-answer id, and ValidatedAt is when the validation actually ran
+// (RFC 3339) — validation is time-anchored (revocation can post-date it), so
+// an answer served later than it was produced is presented "as of" this
+// moment, never as current. All four are set by the serving side, not by
 // NormalizeReport.
 type Validation struct {
 	SignatureID     string      `json:"signatureId,omitempty"`
@@ -74,6 +77,7 @@ type Validation struct {
 	Signatures      []Signature `json:"signatures,omitempty"` // every signature, in report order
 	Pass            bool        `json:"pass"`
 	ReportID        string      `json:"reportId,omitempty"`
+	ValidatedAt     string      `json:"validatedAt,omitempty"` // when the validation ran (RFC 3339)
 
 	// In-process fields, deliberately NOT on the wire (kept off it so the wire
 	// contract stays exactly what consumers already exchange).
