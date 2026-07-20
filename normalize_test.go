@@ -259,6 +259,7 @@ func TestWireContractKeys(t *testing.T) {
 		SigningTime: "t1", RevocationTime: "t2", MaxValidityTime: "t3",
 		SignedFiles: []string{"f"}, Warnings: []string{"w"}, Errors: []string{"e"},
 		Signatures: []Signature{{Verdict: VerdictPassed}}, Pass: true, ReportID: "r",
+		ValidatedAt:     "t4",
 		SignaturesCount: 1, ValidSignaturesCount: 1, ValidationLevel: "ARCHIVAL_DATA",
 	}
 	raw, err := json.Marshal(full)
@@ -271,7 +272,8 @@ func TestWireContractKeys(t *testing.T) {
 	}
 	want := []string{"signatureId", "documentId", "verdict", "format", "level", "signer",
 		"signerSerial", "organization", "containerForm", "signingTime", "revocationTime",
-		"maxValidityTime", "signedFiles", "warnings", "errors", "signatures", "pass", "reportId"}
+		"maxValidityTime", "signedFiles", "warnings", "errors", "signatures", "pass", "reportId",
+		"validatedAt"}
 	if len(keys) != len(want) {
 		t.Fatalf("wire keys: got %d (%v), want %d", len(keys), keys, len(want))
 	}
