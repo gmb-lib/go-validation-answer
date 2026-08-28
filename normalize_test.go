@@ -23,10 +23,29 @@ func testIDCodeLV(digit int) string {
 	return "PNOLV-" + strings.Repeat(d, 6) + "-" + strings.Repeat(d, 5)
 }
 
-// The two test people the fixtures below sign as.
+// testRegNoLV returns a Latvian organisation registration number in the NTR form
+// the validation provider reports: the country and an eleven-digit number whose
+// leading group identifies the register. Assembled from its parts for the same
+// reason as testIDCodeLV, and with the same visible-placeholder rule — the serial
+// is a run of one digit, so nobody reads it as a real company.
+func testRegNoLV(digit int) string {
+	return "NTRLV-" + testRegDigitsLV(digit)
+}
+
+// testRegDigitsLV is the bare number, without the NTR prefix — the provider
+// reports it in both forms, and the bare one is the shape a prefix-matching
+// search cannot see.
+func testRegDigitsLV(digit int) string {
+	const register = "4000"
+
+	return register + strings.Repeat(strconv.Itoa(digit), 7)
+}
+
+// The two test people the fixtures below sign as, and the organisation.
 var (
 	firstSignerID  = testIDCodeLV(1)
 	secondSignerID = testIDCodeLV(2)
+	testOrgRegNo   = testRegDigitsLV(0)
 )
 
 // passingReport is a signerExt-layout report (nested identity, flat times,
@@ -192,11 +211,11 @@ func TestNormalizeMultipleSignatures(t *testing.T) {
 }
 
 func TestNormalizeOrgSealWithWarnings(t *testing.T) {
-	const orgSeal = `{"data":{"signatureForm":"PDF",` +
+	orgSeal := `{"data":{"signatureForm":"PDF",` +
 		`"signaturesExt":[{"id":"S1","indication":"TOTAL-PASSED","signatureLevel":"ADESEAL_QC",` +
 		`"signatureFormat":"PAdES_BASELINE_LT",` +
 		`"signerExt":{"signedby":"EXAMPLE ORG SEAL","organization":"Example Org",` +
-		`"signerSerialNumber":"40000000000","registrationNumber":"NTRLV-40000000000"},` +
+		`"signerSerialNumber":"` + testOrgRegNo + `","registrationNumber":"NTRLV-` + testOrgRegNo + `"},` +
 		`"timeStamp":"2026-06-27T07:22:26Z","ocspResponceTime":"2026-06-27T07:22:26Z",` +
 		`"errors":[],"warnings":[{"content":"The private key does not reside in a QSCD at (best) signing time!"},` +
 		`{"content":"The private key does not reside in a QSCD at issuance time!"}]}],` +
@@ -213,7 +232,7 @@ func TestNormalizeOrgSealWithWarnings(t *testing.T) {
 	if res.Level != "AdES" {
 		t.Fatalf("level: got %q (want AdES for a QC seal not on a QSCD)", res.Level)
 	}
-	if res.SignerSerial != "NTRLV-40000000000" || res.Organization != "Example Org" {
+	if res.SignerSerial != testRegNoLV(0) || res.Organization != "Example Org" {
 		t.Fatalf("org identity: got %q/%q (registration number preferred)", res.SignerSerial, res.Organization)
 	}
 	if len(res.Warnings) != 2 {
