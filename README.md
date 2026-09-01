@@ -63,3 +63,15 @@ an explicit, reviewed act, never a side effect.
 - No validation calls, no HTTP — bytes in, answer out.
 - No cryptographic interpretation; presence/verdict mapping only.
 - The verbatim report itself is not reshaped or re-served by this package.
+
+## Contributing
+
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) names the gate a
+change has to pass, what a change to this library needs, and the sign-off every commit carries.
+
+Suspected vulnerabilities go through the private route in [SECURITY.md](SECURITY.md) — never a
+public issue.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

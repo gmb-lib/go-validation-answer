@@ -2,15 +2,58 @@ package answer
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 	"testing"
+)
+
+// testIDCodeLV returns a Latvian personal identity code in the PNO form the
+// validation provider reports: the country, a six-digit leading group (not a date
+// of birth, in the modern Latvian form) and a five-digit serial. Each test person
+// is one repeated digit, so a reader can see at a glance that it is a placeholder
+// and which signer it belongs to.
+//
+// It is assembled from those parts at run time rather than written as a literal —
+// an identifier-shaped constant in the source is indistinguishable from a
+// credential to a secret scanner, and indistinguishable from a real person's code
+// to a reader.
+func testIDCodeLV(digit int) string {
+	d := strconv.Itoa(digit)
+
+	return "PNOLV-" + strings.Repeat(d, 6) + "-" + strings.Repeat(d, 5)
+}
+
+// testRegNoLV returns a Latvian organisation registration number in the NTR form
+// the validation provider reports: the country and an eleven-digit number whose
+// leading group identifies the register. Assembled from its parts for the same
+// reason as testIDCodeLV, and with the same visible-placeholder rule — the serial
+// is a run of one digit, so nobody reads it as a real company.
+func testRegNoLV(digit int) string {
+	return "NTRLV-" + testRegDigitsLV(digit)
+}
+
+// testRegDigitsLV is the bare number, without the NTR prefix — the provider
+// reports it in both forms, and the bare one is the shape a prefix-matching
+// search cannot see.
+func testRegDigitsLV(digit int) string {
+	const register = "4000"
+
+	return register + strings.Repeat(strconv.Itoa(digit), 7)
+}
+
+// The two test people the fixtures below sign as, and the organisation.
+var (
+	firstSignerID  = testIDCodeLV(1)
+	secondSignerID = testIDCodeLV(2)
+	testOrgRegNo   = testRegDigitsLV(0)
 )
 
 // passingReport is a signerExt-layout report (nested identity, flat times,
 // string file list): one qualified personal signature on a container.
-const passingReport = `{"data":{"signatureForm":"ASiC-E","validationLevel":"LTA",` +
+var passingReport = `{"data":{"signatureForm":"ASiC-E","validationLevel":"LTA",` +
 	`"signaturesExt":[{"id":"S1","indication":"TOTAL-PASSED","signatureLevel":"QESIG",` +
 	`"signatureFormat":"XAdES_BASELINE_LT",` +
-	`"signerExt":{"signedby":"TEST SIGNER","signerSerialNumber":"PNOLV-111111-11111"},` +
+	`"signerExt":{"signedby":"TEST SIGNER","signerSerialNumber":"` + firstSignerID + `"},` +
 	`"timeStamp":"2026-06-27T07:22:26Z","ocspResponceTime":"2026-06-27T07:22:27Z",` +
 	`"maximumValidityTime":"2030-01-01T00:00:00Z","errors":[],"warnings":[]}],` +
 	`"signaturesCount":1,"validSignaturesCount":1,` +
@@ -20,13 +63,13 @@ const passingReport = `{"data":{"signatureForm":"ASiC-E","validationLevel":"LTA"
 // info, data-level object file list): a re-validated archive-timestamped
 // container, as the validation API family also produces. Mirrors a real
 // post-archive report byte-shape with a synthesized signer.
-const archivalReport = `{"data":{"includedFiles":[{"filename":"test.txt"}],` +
+var archivalReport = `{"data":{"includedFiles":[{"filename":"test.txt"}],` +
 	`"signatureForm":"ASiC-E","signaturesCount":1,` +
 	`"signaturesExt":[{"errors":[],"id":"id-1","indication":"TOTAL-PASSED",` +
 	`"info":{"bestSignatureTime":"2026-07-19T08:57:32Z","ocspResponseCreationTime":"2026-07-19T08:57:33Z",` +
 	`"signatureProductionPlace":{},"signerRole":[],"timestampCreationTime":"2026-07-19T08:57:32Z"},` +
 	`"signatureFormat":"XAdES_BASELINE_LTA","signatureLevel":"QESIG",` +
-	`"signedBy":"TEST SIGNER","signerSerialNumber":"PNOLV-111111-11111","subIndication":"",` +
+	`"signedBy":"TEST SIGNER","signerSerialNumber":"` + firstSignerID + `","subIndication":"",` +
 	`"warnings":[{"content":"The trusted list is not considered as fresh!"}]}],` +
 	`"validSignaturesCount":1,"validatedDocument":{"filename":"1.extended.edoc"},` +
 	`"validationLevel":"ARCHIVAL_DATA"}}`
@@ -42,7 +85,7 @@ func TestNormalizePassedQualifiedPerson(t *testing.T) {
 	if res.Format != "XAdES_BASELINE_LT" || res.Level != "QES" {
 		t.Fatalf("format/level: got %q/%q", res.Format, res.Level)
 	}
-	if res.Signer != "TEST SIGNER" || res.SignerSerial != "PNOLV-111111-11111" || res.Organization != "" {
+	if res.Signer != "TEST SIGNER" || res.SignerSerial != firstSignerID || res.Organization != "" {
 		t.Fatalf("identity: got %q/%q/%q", res.Signer, res.SignerSerial, res.Organization)
 	}
 	if res.ContainerForm != "ASiC-E" {
@@ -78,7 +121,7 @@ func TestNormalizeArchivalLayout(t *testing.T) {
 	if res.Format != "XAdES_BASELINE_LTA" || res.Level != "QES" {
 		t.Fatalf("format/level: got %q/%q", res.Format, res.Level)
 	}
-	if res.Signer != "TEST SIGNER" || res.SignerSerial != "PNOLV-111111-11111" {
+	if res.Signer != "TEST SIGNER" || res.SignerSerial != firstSignerID {
 		t.Fatalf("identity from the top-level layout: got %q/%q", res.Signer, res.SignerSerial)
 	}
 	if res.SigningTime != "2026-07-19T08:57:32Z" {
@@ -103,12 +146,12 @@ func TestNormalizeArchivalLayout(t *testing.T) {
 // horizon all normalize from the same fields. Mirrors a real post-archive
 // report byte-shape with a synthesized signer.
 func TestNormalizeArchivedSignerExtLayout(t *testing.T) {
-	const v2Archival = `{"data":{"signatureForm":"ASiC-E","signaturesCount":1,` +
+	v2Archival := `{"data":{"signatureForm":"ASiC-E","signaturesCount":1,` +
 		`"signaturesExt":[{"errors":[],"id":"id-1","indication":"TOTAL-PASSED",` +
 		`"ocspResponceTime":"2026-07-19T08:57:33Z","signatureFormat":"XAdES_BASELINE_LTA",` +
 		`"signatureLevel":"QESIG",` +
 		`"signerExt":{"signatureProductionPlace":{},"signedby":"TEST SIGNER","signerRole":[],` +
-		`"signerSerialNumber":"PNOLV-111111-11111"},"subIndication":"",` +
+		`"signerSerialNumber":"` + firstSignerID + `"},"subIndication":"",` +
 		`"timeStamp":"2026-07-19T08:57:32Z",` +
 		`"warnings":[{"content":"The trusted list is not considered as fresh!"}],` +
 		`"maximumValidityTime":"2027-12-13T08:36:59Z"}],"validSignaturesCount":1,` +
@@ -137,13 +180,13 @@ func TestNormalizeArchivedSignerExtLayout(t *testing.T) {
 }
 
 func TestNormalizeMultipleSignatures(t *testing.T) {
-	const twoSigs = `{"data":{"signatureForm":"ASiC-E",` +
+	twoSigs := `{"data":{"signatureForm":"ASiC-E",` +
 		`"signaturesExt":[` +
 		`{"id":"S1","indication":"TOTAL-PASSED","signatureLevel":"QESIG","signatureFormat":"XAdES_BASELINE_LT",` +
-		`"signerExt":{"signedby":"FIRST SIGNER","signerSerialNumber":"PNOLV-111111-11111"},` +
+		`"signerExt":{"signedby":"FIRST SIGNER","signerSerialNumber":"` + firstSignerID + `"},` +
 		`"timeStamp":"2026-06-28T10:00:00Z","ocspResponceTime":"2026-06-28T10:00:01Z","errors":[],"warnings":[]},` +
 		`{"id":"S2","indication":"TOTAL-PASSED","signatureLevel":"QESIG","signatureFormat":"XAdES_BASELINE_LT",` +
-		`"signerExt":{"signedby":"SECOND SIGNER","signerSerialNumber":"PNOLV-222222-22222"},` +
+		`"signerExt":{"signedby":"SECOND SIGNER","signerSerialNumber":"` + secondSignerID + `"},` +
 		`"timeStamp":"2026-06-28T11:00:00Z","ocspResponceTime":"2026-06-28T11:00:01Z","errors":[],"warnings":[]}],` +
 		`"signaturesCount":2,"validSignaturesCount":2,` +
 		`"validatedDocument":{"fileName":"c.asice","includedFiles":["contract.pdf"]}}}`
@@ -162,17 +205,17 @@ func TestNormalizeMultipleSignatures(t *testing.T) {
 		t.Fatalf("second signingTime: got %q", res.Signatures[1].SigningTime)
 	}
 	// The top-level per-signer fields mirror the first signature (backward compat).
-	if res.Signer != "FIRST SIGNER" || res.SignerSerial != "PNOLV-111111-11111" {
+	if res.Signer != "FIRST SIGNER" || res.SignerSerial != firstSignerID {
 		t.Fatalf("top-level mirror: got signer=%q serial=%q", res.Signer, res.SignerSerial)
 	}
 }
 
 func TestNormalizeOrgSealWithWarnings(t *testing.T) {
-	const orgSeal = `{"data":{"signatureForm":"PDF",` +
+	orgSeal := `{"data":{"signatureForm":"PDF",` +
 		`"signaturesExt":[{"id":"S1","indication":"TOTAL-PASSED","signatureLevel":"ADESEAL_QC",` +
 		`"signatureFormat":"PAdES_BASELINE_LT",` +
 		`"signerExt":{"signedby":"EXAMPLE ORG SEAL","organization":"Example Org",` +
-		`"signerSerialNumber":"40000000000","registrationNumber":"NTRLV-40000000000"},` +
+		`"signerSerialNumber":"` + testOrgRegNo + `","registrationNumber":"NTRLV-` + testOrgRegNo + `"},` +
 		`"timeStamp":"2026-06-27T07:22:26Z","ocspResponceTime":"2026-06-27T07:22:26Z",` +
 		`"errors":[],"warnings":[{"content":"The private key does not reside in a QSCD at (best) signing time!"},` +
 		`{"content":"The private key does not reside in a QSCD at issuance time!"}]}],` +
@@ -189,7 +232,7 @@ func TestNormalizeOrgSealWithWarnings(t *testing.T) {
 	if res.Level != "AdES" {
 		t.Fatalf("level: got %q (want AdES for a QC seal not on a QSCD)", res.Level)
 	}
-	if res.SignerSerial != "NTRLV-40000000000" || res.Organization != "Example Org" {
+	if res.SignerSerial != testRegNoLV(0) || res.Organization != "Example Org" {
 		t.Fatalf("org identity: got %q/%q (registration number preferred)", res.SignerSerial, res.Organization)
 	}
 	if len(res.Warnings) != 2 {
