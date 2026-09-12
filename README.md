@@ -9,6 +9,9 @@ struct per consumer.
 go get github.com/gmb-lib/go-validation-answer
 ```
 
+See [`CHANGELOG.md`](./CHANGELOG.md) for what each release changed, and what it means for code that
+already uses this library, before you bump.
+
 Zero dependencies (standard library only). Import path package name: `answer`.
 
 ## Why
